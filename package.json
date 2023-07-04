@@ -1,0 +1,16 @@
+{
+  "name": "roleretriever",
+  "version": "1.0.0",
+  "description": "Access Control Role Retriever for Web3 Contracts",
+  "main": "index.js",
+  "scripts": {
+    "build": "node index.js"
+  },
+  "author": "0xtraub",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "ethers": "^6.6.2",
+    "express": "^4.18.2"
+  }
+}
