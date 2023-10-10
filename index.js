@@ -8,11 +8,11 @@ const port = 8080
 const exampleContract = "0x3C2982CA260e870eee70c423818010DfeF212659";
 
 const RPC_URLS = {
-    1: process.env.MAINNET_RPC,
-    10: process.env.OPTIMISM_RPC,
-    137: process.env.POLYGON_RPC,
-    250: process.env.FANTOM_RPC,
-    42161: process.env.ARBITRUM_RPC,
+  1: process.env.MAINNET_RPC,
+  10: process.env.OPTIMISM_RPC,
+  137: process.env.POLYGON_RPC,
+  250: process.env.FANTOM_RPC,
+  42161: process.env.ARBITRUM_RPC,
 }
 
 const explorer_base = {
@@ -23,6 +23,13 @@ const explorer_base = {
   42161: "https://arbiscan.io/tx/"
 }
 
+const chains = {
+  1: "Mainnet",
+  10: "optimism",
+  137: "Polygon",
+  250: "Fantom",
+  42161: "Arbitrum"
+}
 const abi = [
   "event RoleGranted(bytes32 indexed, address indexed, address indexed)",
   "event RoleRevoked(bytes32 indexed, address indexed, address indexed)",
@@ -39,12 +46,13 @@ app.get('/:chainId/:address', async (req, res) => {
 
   h3 {
     margin-block-end: 0em;
+    font-family: monospace;
   }
 
   h4 {
     margin-block-end: 0em;
-    margin-block-start: 0.5em
-
+    margin-block-start: 0.5em;
+    font-family: monospace;
   }
 
   p, a, h5 {
@@ -53,6 +61,7 @@ app.get('/:chainId/:address', async (req, res) => {
   </style>
   <h1>RoleRetriever</h1>
   <h2>Role-based Access Control Viewer for Smart Contracts</h2>
+  <h2>Network: ${chains[req.params.chainId]}
   <h2>${req.params.address}</h2>`
 
   try {
@@ -76,7 +85,8 @@ app.get('/:chainId/:address', async (req, res) => {
       if (roles[role] == undefined) {
         roles[role] = []
       }
-    roles[role].push({
+
+      roles[role].push({
         user: user,
         tx: log.transactionHash
     })
@@ -96,7 +106,7 @@ app.get('/:chainId/:address', async (req, res) => {
 
     Object.keys(roles).forEach(key => {
       pageView += `<h3>${key}</h3>`
-      pageView += `<h4>Admin: ${roleAdmins[key] != undefined ? roleAdmins[key] : '0x0000000000000000000000000000000000000000000000000000000000000000'}</h4>`
+      pageView += `<h4>Admin Role: ${roleAdmins[key] != undefined ? roleAdmins[key] : '0x0000000000000000000000000000000000000000000000000000000000000000'}</h4>`
       roles[key].forEach(user => {
         pageView += `<p style=\"margin-block-end:0em\">User: ${user.user}</p>`
         pageView += `<a href=\"${explorer_base[req.params.chainId] + user.tx}\" target=_blank>Tx: ${user.tx}</a></br>`
