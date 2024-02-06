@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ethers::core::types::{U64,H256,Address,Filter};
 use ethers::providers::{Http, Middleware, Provider};
-use ethers::prelude::{abigen, Abigen};
+use ethers::prelude::abigen;
 use std::sync::Arc;
 
 use eyre::Result;
@@ -11,9 +11,19 @@ use clap::Parser;
 
 extern crate tokio;
 
+const ASCII_ART: &str = r#"
+        ██████   ██████  ██      ███████     ██████  ███████ ████████ ██████  ██ ███████ ██    ██ ███████ ██████  
+        ██   ██ ██    ██ ██      ██          ██   ██ ██         ██    ██   ██ ██ ██      ██    ██ ██      ██   ██ 
+        ██████  ██    ██ ██      █████       ██████  █████      ██    ██████  ██ █████   ██    ██ █████   ██████  
+        ██   ██ ██    ██ ██      ██          ██   ██ ██         ██    ██   ██ ██ ██       ██  ██  ██      ██   ██ 
+        ██   ██  ██████  ███████ ███████     ██   ██ ███████    ██    ██   ██ ██ ███████   ████   ███████ ██   ██ 
+by @0xTraub              
+"#;
+
 struct UserHasRole {
     pub address: Address,
-    pub block_num: U64
+    pub block_num: U64,
+    pub tx_hash: H256
 }
 
 #[derive(Parser,Default,Debug)]
@@ -31,17 +41,17 @@ struct Arguments {
 //Custom Debug Formatter for the Struct UserHasRole
 impl fmt::Debug for UserHasRole {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "User: {:?} granted role at block: {:?}", self.address, self.block_num)
+        write!(f, "User: {:?} granted role at block: {:?}\nTxHash: {:?}\n", self.address, self.block_num, self.tx_hash)
     }
 }
 
 fn display_role_info(role: &H256, admin_role: &H256, users: &Vec<UserHasRole>) {
     let default_admin_role = H256::zero();
     if role.eq(&default_admin_role) {
-        println!("DEFAULT ADMIN ROLE");
+        println!("--- DEFAULT ADMIN ROLE: {:?}", Address::zero());
     }
     else {
-        println!("Role: {:?}", role);
+        println!("--- Role: {:?}", role);
     }
 
     println!("Admin Role: {:?}", admin_role);
@@ -49,7 +59,6 @@ fn display_role_info(role: &H256, admin_role: &H256, users: &Vec<UserHasRole>) {
     for user in users {
         println!("{:?}", user);
     }
-    println!("\n");
 }
 
 async fn get_provider()-> Result<(Provider::<Http>, U64, Address, U64)> {
@@ -84,10 +93,9 @@ async fn get_provider()-> Result<(Provider::<Http>, U64, Address, U64)> {
     }
 
     Ok((provider, block_number, args.contract, current_block))
-
 }
 
-async fn getRoleAdmin(provider: Provider<Http>, addr: &Address, role: &H256) -> Result<H256> {
+async fn get_role_admin(provider: Provider<Http>, addr: &Address, role: &H256) -> Result<H256> {
 
     abigen!(
         AccessControl,
@@ -108,6 +116,7 @@ async fn getRoleAdmin(provider: Provider<Http>, addr: &Address, role: &H256) -> 
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    println!("{}", ASCII_ART); 
     let mut roles: Vec<H256> = Vec::new();
     let mut role_users: HashMap<H256, Vec<UserHasRole>> = HashMap::new();
     let mut role_admins: HashMap<H256, H256> = HashMap::new();
@@ -120,8 +129,19 @@ async fn main() -> Result<()> {
     let role_added_sig: H256 = "0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d".parse::<H256>()?;
     let role_removed_sig: H256 = "0x04f4ba83d654385553482c5bc933c544b42dcbf063cbb948f438e89a646b4ed5".parse::<H256>()?;
 
-    // let provider = Provider::try_from(rpc_url)?;
     let (provider, block_num, address, current_block) = get_provider().await?;
+
+    let chain_id = &provider.get_chainid().await?;
+    let chain_name: String = match chain_id.as_u64() {
+        1 => "Ethereum".to_string(),
+        10 => "Optimism".to_string(),
+        137 => "Polygon".to_string(),
+        42161 => "Arbitrum".to_string(),
+        43114 => "Avalanche".to_string(),
+        _ => chain_id.to_string()
+    };
+
+    println!("SCANNING Contract {:?} on chain {:?} starting at block {:?}\n", address, chain_name, block_num);
 
     //Call the Address struct's funcstion "parse" and parse the string slice
     let add_role_filter = Filter::new()
@@ -156,7 +176,8 @@ async fn main() -> Result<()> {
 
                 let user_granted_role = UserHasRole {
                     address: Address::from(log.topics[2]),
-                    block_num: log.block_number.unwrap()
+                    block_num: log.block_number.unwrap(),
+                    tx_hash: log.transaction_hash.unwrap()
                 };
         
                 //Get a mutable reference to the hashmap list and add the new user to the vector
@@ -165,13 +186,12 @@ async fn main() -> Result<()> {
             }
         
             else {
-                // println!("new role: {:?}", *role_name);
-                roles.push(*role_name);//Push the list of roles onto the vec by dereferencing the borrows
+                    roles.push(*role_name);//Push the list of roles onto the vec by dereferencing the borrows
                 
                 //Create a new vector so that we can push to it going forward
                 role_users.insert(*role_name, Vec::new());
 
-                let role_admin: H256 = getRoleAdmin(provider.clone(), &address, role_name).await?;
+                let role_admin: H256 = get_role_admin(provider.clone(), &address, role_name).await?;
                 role_admins.insert(*role_name, role_admin);
             }
         }
@@ -197,5 +217,4 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
-
 }
