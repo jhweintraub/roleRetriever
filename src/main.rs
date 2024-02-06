@@ -1,5 +1,10 @@
 use std::collections::HashMap;
-use ethers::prelude::*;
+
+use ethers::core::types::{U64,H256,Address,Filter};
+use ethers::providers::{Http, Middleware, Provider};
+use ethers::prelude::{abigen, Abigen};
+use std::sync::Arc;
+
 use eyre::Result;
 use std::fmt;
 use clap::Parser;
@@ -80,10 +85,32 @@ async fn get_provider()-> Result<(Provider::<Http>, U64, Address, U64)> {
 
 }
 
+async fn getRoleAdmin(provider: &Provider<Http>, addr: &Address, role: &H256) -> Result<H256> {
+
+    abigen!(
+        AccessControl,
+        r#"[
+            function getRoleAdmin(bytes32) external view returns (bytes32)
+        ]"#,
+    );
+
+    let client = Arc::new(&provider);
+    let contract = AccessControl::new(*addr, client);
+
+    if let Ok(get_role_admin) = contract.get_role_admin(*role.as_fixed_bytes()).call().await {
+        println!("testing");
+        println!("{:?}", get_role_admin);
+    };
+
+
+    Ok(*role)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut roles: Vec<H256> = Vec::new();
     let mut role_users: HashMap<H256, Vec<UserHasRole>> = HashMap::new();
+    let mut role_admins: HashMap<H256, H256> = HashMap::new();
 
     // let contract_address: &str = "0x853d955aCEf822Db058eb8505911ED77F175b99e";
     let add_role_event_name = String::from("RoleGranted(bytes32,address,address)");
@@ -143,6 +170,9 @@ async fn main() -> Result<()> {
                 
                 //Create a new vector so that we can push to it going forward
                 role_users.insert(*role_name, Vec::new());
+
+                let roleAdmin: H256 = getRoleAdmin(&provider, &address, role_name).await?;
+                role_admins.insert(*role_name, roleAdmin);
             }
         }
 
