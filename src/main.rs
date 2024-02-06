@@ -35,7 +35,7 @@ impl fmt::Debug for UserHasRole {
     }
 }
 
-fn display_role_info(role: &H256, users: &Vec<UserHasRole>) {
+fn display_role_info(role: &H256, admin_role: &H256, users: &Vec<UserHasRole>) {
     let default_admin_role = H256::zero();
     if role.eq(&default_admin_role) {
         println!("DEFAULT ADMIN ROLE");
@@ -43,6 +43,8 @@ fn display_role_info(role: &H256, users: &Vec<UserHasRole>) {
     else {
         println!("Role: {:?}", role);
     }
+
+    println!("Admin Role: {:?}", admin_role);
 
     for user in users {
         println!("{:?}", user);
@@ -85,7 +87,7 @@ async fn get_provider()-> Result<(Provider::<Http>, U64, Address, U64)> {
 
 }
 
-async fn getRoleAdmin(provider: &Provider<Http>, addr: &Address, role: &H256) -> Result<H256> {
+async fn getRoleAdmin(provider: Provider<Http>, addr: &Address, role: &H256) -> Result<H256> {
 
     abigen!(
         AccessControl,
@@ -94,16 +96,14 @@ async fn getRoleAdmin(provider: &Provider<Http>, addr: &Address, role: &H256) ->
         ]"#,
     );
 
-    let client = Arc::new(&provider);
+    let client = Arc::new(provider);
     let contract = AccessControl::new(*addr, client);
 
-    if let Ok(get_role_admin) = contract.get_role_admin(*role.as_fixed_bytes()).call().await {
-        println!("testing");
-        println!("{:?}", get_role_admin);
-    };
+    let role_admin = contract.get_role_admin(*role.as_fixed_bytes()).call().await?;
+    let _admin: H256 = role_admin.into();
 
+    Ok(_admin)
 
-    Ok(*role)
 }
 
 #[tokio::main]
@@ -171,8 +171,8 @@ async fn main() -> Result<()> {
                 //Create a new vector so that we can push to it going forward
                 role_users.insert(*role_name, Vec::new());
 
-                let roleAdmin: H256 = getRoleAdmin(&provider, &address, role_name).await?;
-                role_admins.insert(*role_name, roleAdmin);
+                let role_admin: H256 = getRoleAdmin(provider.clone(), &address, role_name).await?;
+                role_admins.insert(*role_name, role_admin);
             }
         }
 
@@ -187,7 +187,7 @@ async fn main() -> Result<()> {
     }
 
     for role in &roles {
-        display_role_info(&role, role_users.get(&role).unwrap())
+        display_role_info(&role, role_admins.get(&role).unwrap(), role_users.get(&role).unwrap())
     }
 
     //If no events were found in the last n-blocks then print and exit.
