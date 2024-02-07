@@ -61,7 +61,7 @@ fn display_role_info(role: &H256, admin_role: &H256, users: &Vec<UserHasRole>) {
     }
 }
 
-async fn get_provider()-> Result<(Provider::<Http>, U64, Address, U64)> {
+async fn get_provider() -> Result<(Provider::<Http>, U64, Address, U64)> {
     let fallback_rpc_url: String = String::from("https://eth.llamarpc.com");
     let fallback_block_range: i32 = 99999;
 
@@ -96,7 +96,6 @@ async fn get_provider()-> Result<(Provider::<Http>, U64, Address, U64)> {
 }
 
 async fn get_role_admin(provider: Provider<Http>, addr: &Address, role: &H256) -> Result<H256> {
-
     abigen!(
         AccessControl,
         r#"[
@@ -111,7 +110,6 @@ async fn get_role_admin(provider: Provider<Http>, addr: &Address, role: &H256) -
     let _admin: H256 = role_admin.into();
 
     Ok(_admin)
-
 }
 
 #[tokio::main]
